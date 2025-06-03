@@ -29,13 +29,13 @@ int map_char_int(char c)
     return -1;
 }
 
-void get_board(cJSON* board_array, int board[][10])
+void get_board(cJSON* board_array, int int_board[][10])
 {
     for(int i=1;i<=8;i++){
         cJSON* row = cJSON_GetArrayItem(board_array, i-1);
         const char* line = row -> valuestring;
         for(int j=1;j<=8;j++){
-            board[i][j] = map_char_int(line[j-1]);
+            int_board[i][j] = map_char_int(line[j-1]);
         }
     }
 }
@@ -368,7 +368,7 @@ int main(int argc, char *argv[]) {
     char server_port[16] = {0};
     char username[32]   = {0};
 
-    int board[10][10];
+    int int_board[10][10];
 
     for (int i = 1; i < argc; i += 2) {
         if (strcmp(argv[i], "-ip") == 0) {
@@ -473,8 +473,8 @@ int main(int argc, char *argv[]) {
             cJSON *board_json = cJSON_GetObjectItem(root, "board");
             cJSON *timeout    = cJSON_GetObjectItem(root, "timeout");
 
-            get_board(board_json, board);
-            draw_board(canvas, board);
+            get_board(board_json, int_board);
+            draw_board(canvas, int_board);
 
             if (cJSON_IsArray(board_json) && cJSON_IsNumber(timeout)) {
                 int sx = 0, sy = 0, tx = 0, ty = 0;
