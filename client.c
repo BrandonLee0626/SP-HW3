@@ -16,6 +16,19 @@ char g_username[32];
 
 #define SIZE 8
 
+int map_char_int(char c)
+{
+    switch (c)
+    {
+    case '.': return 0;
+    case '#': return 1;
+    case 'R': return 2;
+    case 'B': return 3;
+    }
+
+    return -1;
+}
+
 void get_board(cJSON* board_array, int board[][10])
 {
     for(int i=1;i<=8;i++){
