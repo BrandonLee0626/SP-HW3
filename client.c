@@ -209,7 +209,7 @@ static int calc_friend_count(char board[SIZE][SIZE], int r2, int c2, char player
     // 모서리/꼭짓점 보너스
     int edge = (r2 == 0 || r2 == SIZE-1) + (c2 == 0 || c2 == SIZE-1);
     if (edge == 2) cnt += 5;   // 꼭짓점
-    else if (edge == 1) cnt += 3; // 모서리
+    else if (edge == 1) cnt += 1; // 모서리
     return cnt;
 }
 
