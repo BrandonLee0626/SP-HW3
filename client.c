@@ -476,7 +476,7 @@ int main(int argc, char *argv[]) {
             get_board(board_json, int_board);
             draw_board(canvas, int_board);
 
-            sleep(1);
+            usleep(0.3);
 
             if (cJSON_IsArray(board_json) && cJSON_IsNumber(timeout)) {
                 int sx = 0, sy = 0, tx = 0, ty = 0;
