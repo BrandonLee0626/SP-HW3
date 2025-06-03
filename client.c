@@ -316,7 +316,7 @@ static int send_json(int fd, cJSON *obj) {
     char *json_str = cJSON_PrintUnformatted(obj);
     if (!json_str) return -1;
     int len = snprintf(NULL, 0, "%s\n", json_str);
-    char *buf = malloc(len + 1);
+    char *buf = (char *)malloc(len + 1);
     if (!buf) {
         free(json_str);
         return -1;
