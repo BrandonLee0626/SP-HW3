@@ -40,6 +40,7 @@ void get_board(cJSON* board_array, int int_board[][10])
     }
 }
 
+// 2차원 배열로 보드 복사 (8×8 char)
 // JSON 배열을 받아서 board[8][8]에 저장
 // board_json은 길이 8인 문자열 배열: 각 문자열은 8글자(R, B, . 중 하나)
 static void parse_board(const cJSON *board_json, char board[SIZE][SIZE]) {
@@ -51,110 +52,6 @@ static void parse_board(const cJSON *board_json, char board[SIZE][SIZE]) {
         }
     }
 }
-// 2차원 배열로 보드 복사 (8×8 char)
-static void copy_board(char dest[SIZE][SIZE], char src[SIZE][SIZE]) {
-    memcpy(dest, src, SIZE * SIZE);
-}
-
-
-// r1,c1 → r2,c2 이동이 유효한지 검사 (clone/jump 규칙)
-// player는 'R' 또는 'B'
-// 빈칸('.')인지, 내 말인지, 일정 거리 조건(≤1 or ==2)인지 확인
-static int is_valid_move(char board[SIZE][SIZE], int r1, int c1, int r2, int c2, char player) {
-    if (r1 < 0 || r1 >= SIZE || c1 < 0 || c1 >= SIZE) return 0;
-    if (r2 < 0 || r2 >= SIZE || c2 < 0 || c2 >= SIZE) return 0;
-    if (board[r1][c1] != player) return 0;
-    if (board[r2][c2] != '.') return 0;
-    int dr = abs(r2 - r1), dc = abs(c2 - c1);
-    int clone = (dr <= 1 && dc <= 1 && !(dr == 0 && dc == 0));
-    int jump  = ((dr == 2 && dc == 0) || (dr == 0 && dc == 2) || (dr == 2 && dc == 2));
-    return clone || jump;
-}
-
-// 이동 적용: clone 또는 jump 후 flip 처리
-static void apply_move(char board[SIZE][SIZE], int r1, int c1, int r2, int c2, char player) {
-    int dr = abs(r2 - r1), dc = abs(c2 - c1);
-    if (dr <= 1 && dc <= 1) {
-        // clone: 출발지에 말은 그대로, 목적지에 새로운 내 말
-        board[r2][c2] = player;
-    } else {
-        // jump: 출발지를 비우고 목적지에 내 말
-        board[r1][c1] = '.';
-        board[r2][c2] = player;
-    }
-    // flip: 목적지(r2,c2)를 중심으로 8방향에 상대 말이 있으면 내 말로 뒤집기
-    for (int dy = -1; dy <= 1; dy++) {
-        for (int dx = -1; dx <= 1; dx++) {
-            if (dy == 0 && dx == 0) continue;
-            int nr = r2 + dy, nc = c2 + dx;
-            if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) continue;
-            if (board[nr][nc] != player && board[nr][nc] != '.') {
-                board[nr][nc] = player;
-            }
-        }
-    }
-}
-
-// board 상에서 특정 색(player)의 말 개수 세기
-static int count_pieces(char board[SIZE][SIZE], char player) {
-    int cnt = 0;
-    for (int i = 0; i < SIZE; i++)
-        for (int j = 0; j < SIZE; j++)
-            if (board[i][j] == player) cnt++;
-    return cnt;
-}
-
-// 주어진 시뮬레이트 보드에서, player_other가 (sr,sc)로 이동 가능한지 검사
-// (clone/jump 조건만 보면 되는지 확인) → safe jump 판단에 사용
-static int can_opponent_move_to(char board[SIZE][SIZE], int sr, int sc, char player_other) {
-    for (int r = 0; r < SIZE; r++) {
-        for (int c = 0; c < SIZE; c++) {
-            if (board[r][c] != player_other) continue;
-            int dr = abs(sr - r), dc = abs(sc - c);
-            // clone으로 들어올 수 있는지
-            if ((dr <= 1 && dc <= 1) && !(dr == 0 && dc == 0)) {
-                return 1;
-            }
-            // jump으로 들어올 수 있는지
-            if (( (dr == 2 && dc == 0) || (dr == 0 && dc == 2) || (dr == 2 && dc == 2) )) {
-                return 1;
-            }
-        }
-    }
-    return 0;
-}
-
-// (r1,c1)->(r2,c2) 이동 후보에 대해 “내 그리디 값” 계산
-// 이동 전/후 내 말 개수 차이 = after - before
-static int calc_greedy_value(char board[SIZE][SIZE], int r1, int c1, int r2, int c2, char player) {
-    char sim[SIZE][SIZE];
-    copy_board(sim, board);
-    int before = count_pieces(sim, player);
-    apply_move(sim, r1, c1, r2, c2, player);
-    int after = count_pieces(sim, player);
-    return after - before;
-}
-
-// 주어진 보드에서, player의 모든 유효 이동을 (r1,c1,r2,c2) 형태로 moves[][4]에 채우고 개수 반환
-static int gather_moves(char board[SIZE][SIZE], char player, int moves[][4]) {
-    int cnt = 0;
-    for (int r1 = 0; r1 < SIZE; r1++) {
-        for (int c1 = 0; c1 < SIZE; c1++) {
-            if (board[r1][c1] != player) continue;
-            for (int dr = -2; dr <= 2; dr++) {
-                for (int dc = -2; dc <= 2; dc++) {
-                    int r2 = r1 + dr, c2 = c1 + dc;
-                    if (is_valid_move(board, r1, c1, r2, c2, player)) {
-                        moves[cnt][0] = r1;
-                        moves[cnt][1] = c1;
-                        moves[cnt][2] = r2;
-                        moves[cnt][3] = c2;
-                        cnt++;
-                    }
-                }
-            }
-        }
-    }
 // 8방향 델타
 
 static const int dr[8] = { -1, -1, -1,  0, 1, 1, 1,  0 };
@@ -788,6 +685,10 @@ void generate_move(const cJSON *board_json, int *sx, int *sy, int *tx, int *ty) 
     *ty = bestC2 + 1;
 
 }
+
+
+
+
 // recv_json: fd로부터 '\n' 단위로 JSON 문자열 한 줄을 읽어서 동적 할당된 문자열로 반환
 static char *recv_json(int fd) {
     char buffer[BUF_SIZE];
