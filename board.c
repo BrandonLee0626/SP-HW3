@@ -1,5 +1,6 @@
 #include <string.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include "led-matrix-c.h"
 
 #define LED_ROW 64
