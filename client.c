@@ -464,7 +464,7 @@ int main(int argc, char *argv[]) {
         // game_start
         //──────────────────────────────────────────────────────────────────────
         else if (strcmp(type->valuestring, "game_start") == 0) {
-            cJSON* first_player = cJSON_GetObjectItemCaseSensitive("first_player");
+            cJSON* first_player = cJSON_GetObjectItemCaseSensitive(root, "first_player");
             if(strcmp(first_player->valuestring, g_username) == 0) me = 'R';
             else me = 'B';
             printf("[서버] game_start 수신\n");
