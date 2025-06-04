@@ -31,3 +31,60 @@ void clear_board(struct LedCanvas *canvas) {
         }
     }
 }
+
+#ifdef BOARD_STANDALONE
+int main()
+{
+    RGBLedMatrixOptions options;
+    memset(&options, 0, sizeof(options));
+    options.rows = 64;
+    options.cols = 64;
+    options.chain_length = 1;
+    options.parallel = 1;
+    options.hardware_mapping = "regular";
+    options.brightness = 50;
+    options.disable_hardware_pulsing = 1;
+
+    struct RGBLedMatrix *matrix = led_matrix_create_from_options(&options, NULL, NULL);
+    if (matrix == NULL) {
+        return 1;
+    }
+
+    struct LedCanvas *canvas = led_matrix_get_canvas(matrix);
+
+    int board[10][10];
+
+        char line[10], input[100];
+    
+    for(int i=1;i<=8;i++){
+        fgets(line, 10, stdin);
+        for(int j=0;j<8;j++){
+            switch (line[j])
+            {
+            case '.':
+                board[i][j+1] = 0;
+                break;
+
+            case '#':
+                board[i][j+1] = 1;
+                break;
+
+            case 'R':
+                board[i][j+1] = 2;
+                break;
+
+            case 'B':
+                board[i][j+1] = 3;
+                break;
+            
+            default:
+                printf("Board input error");
+                exit(0);
+                break;
+            }
+        }
+    }
+
+    draw_board(canvas, board);
+}
+#endif

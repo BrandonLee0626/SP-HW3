@@ -336,6 +336,7 @@ static void print_usage(const char *progname) {
             progname, progname);
 }
 
+#ifdef CLIENT_STANDALONE
 int main(int argc, char *argv[]) {
     RGBLedMatrixOptions options;
     memset(&options, 0, sizeof(options));
@@ -579,3 +580,4 @@ int main(int argc, char *argv[]) {
     printf("클라이언트 종료\n");
     return 0;
 }
+#endif
