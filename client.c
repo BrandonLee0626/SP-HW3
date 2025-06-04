@@ -39,255 +39,638 @@ void get_board(cJSON* board_array, int int_board[][10])
         }
     }
 }
+// 8방향 델타
 
-// 2차원 배열로 보드 복사 (8×8 char)
+static const int dr[8] = { -1, -1, -1,  0, 1, 1, 1,  0 };
+
+static const int dc[8] = { -1,  0,  1,  1, 1, 0, -1, -1 };
+
+
+// 보드 경계 검사
+
+static int boundary_check(int r, int c) {
+
+    return (r >= 0 && r < SIZE && c >= 0 && c < SIZE);
+
+}
+
+
+// board2에 board1 내용 복사
+
 static void copy_board(char dest[SIZE][SIZE], char src[SIZE][SIZE]) {
-    memcpy(dest, src, SIZE * SIZE);
+
+    memcpy(dest, src, SIZE * SIZE * sizeof(char));
+
 }
 
-// JSON 배열을 받아서 board[8][8]에 저장
-// board_json은 길이 8인 문자열 배열: 각 문자열은 8글자(R, B, . 중 하나)
-static void parse_board(const cJSON *board_json, char board[SIZE][SIZE]) {
-    for (int i = 0; i < SIZE; i++) {
-        const cJSON *row = cJSON_GetArrayItem(board_json, i);
-        const char *str = row->valuestring;
-        for (int j = 0; j < SIZE; j++) {
-            board[i][j] = str[j];
-        }
-    }
-}
 
-// r1,c1 → r2,c2 이동이 유효한지 검사 (clone/jump 규칙)
-// player는 'R' 또는 'B'
-// 빈칸('.')인지, 내 말인지, 일정 거리 조건(≤1 or ==2)인지 확인
-static int is_valid_move(char board[SIZE][SIZE], int r1, int c1, int r2, int c2, char player) {
-    if (r1 < 0 || r1 >= SIZE || c1 < 0 || c1 >= SIZE) return 0;
-    if (r2 < 0 || r2 >= SIZE || c2 < 0 || c2 >= SIZE) return 0;
-    if (board[r1][c1] != player) return 0;
-    if (board[r2][c2] != '.') return 0;
-    int dr = abs(r2 - r1), dc = abs(c2 - c1);
-    int clone = (dr <= 1 && dc <= 1 && !(dr == 0 && dc == 0));
-    int jump  = ((dr == 2 && dc == 0) || (dr == 0 && dc == 2) || (dr == 2 && dc == 2));
-    return clone || jump;
-}
 
-// 이동 적용: clone 또는 jump 후 flip 처리
+// (r1,c1)->(r2,c2) 이동(클론/점프) 후 뒤집기까지 수행
+
 static void apply_move(char board[SIZE][SIZE], int r1, int c1, int r2, int c2, char player) {
-    int dr = abs(r2 - r1), dc = abs(c2 - c1);
-    if (dr <= 1 && dc <= 1) {
-        // clone: 출발지에 말은 그대로, 목적지에 새로운 내 말
+
+    int drc = abs(r2 - r1), dcc = abs(c2 - c1);
+
+    if (drc <= 1 && dcc <= 1) {
+
+        // 클론: 출발지 유지, 목적지에 player 추가
+
         board[r2][c2] = player;
+
     } else {
-        // jump: 출발지를 비우고 목적지에 내 말
+
+        // 점프: 출발지 제거, 목적지에 player 추가
+
         board[r1][c1] = '.';
+
         board[r2][c2] = player;
+
     }
-    // flip: 목적지(r2,c2)를 중심으로 8방향에 상대 말이 있으면 내 말로 뒤집기
-    for (int dy = -1; dy <= 1; dy++) {
-        for (int dx = -1; dx <= 1; dx++) {
-            if (dy == 0 && dx == 0) continue;
-            int nr = r2 + dy, nc = c2 + dx;
-            if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) continue;
-            if (board[nr][nc] != player && board[nr][nc] != '.') {
-                board[nr][nc] = player;
-            }
+
+    // 뒤집기: 목적지 주변 8방향의 상대말 모두 내 말로 교체
+
+    char opp = (player == 'R') ? 'B' : 'R';
+
+    for (int f = 0; f < 8; f++) {
+
+        int nr = r2 + dr[f], nc = c2 + dc[f];
+
+        if (boundary_check(nr, nc) && board[nr][nc] == opp) {
+
+            board[nr][nc] = player;
+
         }
+
     }
+
 }
 
-// board 상에서 특정 색(player)의 말 개수 세기
+
+
+// 특정 색(player)의 말 개수 세기
+
 static int count_pieces(char board[SIZE][SIZE], char player) {
+
     int cnt = 0;
+
     for (int i = 0; i < SIZE; i++)
+
         for (int j = 0; j < SIZE; j++)
+
             if (board[i][j] == player) cnt++;
+
     return cnt;
+
 }
 
-// 주어진 시뮬레이트 보드에서, player_other가 (sr,sc)로 이동 가능한지 검사
-// (clone/jump 조건만 보면 되는지 확인) → safe jump 판단에 사용
-static int can_opponent_move_to(char board[SIZE][SIZE], int sr, int sc, char player_other) {
-    for (int r = 0; r < SIZE; r++) {
-        for (int c = 0; c < SIZE; c++) {
-            if (board[r][c] != player_other) continue;
-            int dr = abs(sr - r), dc = abs(sc - c);
-            // clone으로 들어올 수 있는지
-            if ((dr <= 1 && dc <= 1) && !(dr == 0 && dc == 0)) {
-                return 1;
-            }
-            // jump으로 들어올 수 있는지
-            if (( (dr == 2 && dc == 0) || (dr == 0 && dc == 2) || (dr == 2 && dc == 2) )) {
-                return 1;
-            }
-        }
-    }
-    return 0;
+
+
+// (r1,c1)->(r2,c2) 이동이 유효한지 검사 (클론/점프 규칙)
+
+static int is_valid_move(char board[SIZE][SIZE], int r1, int c1, int r2, int c2, char player) {
+
+    if (!boundary_check(r1, c1) || !boundary_check(r2, c2)) return 0;
+
+    if (board[r1][c1] != player) return 0;
+
+    if (board[r2][c2] != '.') return 0;
+
+    int drc = abs(r2 - r1), dcc = abs(c2 - c1);
+
+    int clone = (drc <= 1 && dcc <= 1 && !(drc == 0 && dcc == 0));
+
+    int jump  = ((drc == 2 && dcc == 0) || (drc == 0 && dcc == 2) || (drc == 2 && dcc == 2));
+
+    return (clone || jump);
+
 }
 
-// (r1,c1)->(r2,c2) 이동 후보에 대해 “내 그리디 값” 계산
-// 이동 전/후 내 말 개수 차이 = after - before
-static int calc_greedy_value(char board[SIZE][SIZE], int r1, int c1, int r2, int c2, char player) {
-    char sim[SIZE][SIZE];
-    copy_board(sim, board);
-    int before = count_pieces(sim, player);
-    apply_move(sim, r1, c1, r2, c2, player);
-    int after = count_pieces(sim, player);
-    return after - before;
-}
 
-// 주어진 보드에서, player의 모든 유효 이동을 (r1,c1,r2,c2) 형태로 moves[][4]에 채우고 개수 반환
+
+// 보드에서 player의 모든 유효 이동(r1,c1→r2,c2)을 moves[][4]에 채워 개수 반환
+
 static int gather_moves(char board[SIZE][SIZE], char player, int moves[][4]) {
+
     int cnt = 0;
+
     for (int r1 = 0; r1 < SIZE; r1++) {
+
         for (int c1 = 0; c1 < SIZE; c1++) {
+
             if (board[r1][c1] != player) continue;
-            for (int dr = -2; dr <= 2; dr++) {
-                for (int dc = -2; dc <= 2; dc++) {
-                    int r2 = r1 + dr, c2 = c1 + dc;
+
+            for (int drd = -2; drd <= 2; drd++) {
+
+                for (int dcd = -2; dcd <= 2; dcd++) {
+
+                    int r2 = r1 + drd, c2 = c1 + dcd;
+
                     if (is_valid_move(board, r1, c1, r2, c2, player)) {
+
                         moves[cnt][0] = r1;
+
                         moves[cnt][1] = c1;
+
                         moves[cnt][2] = r2;
+
                         moves[cnt][3] = c2;
+
                         cnt++;
+
                     }
+
                 }
+
             }
+
         }
+
     }
+
     return cnt;
+
 }
 
-// 시뮬 보드에 (r1,c1)->(r2,c2,player) 이동 적용 후
-// 상대(opp)가 가질 수 있는 모든 이동의 그리디 값을 계산해서 그중 최대값 반환
-static int calc_opponent_max_greedy(char board[SIZE][SIZE], int r1, int c1, int r2, int c2, char player) {
+
+
+// (r1,c1)->(r2,c2)에 따른 그리디 값 = (이동 후 내 말 개수) - (이동 전 내 말 개수)
+
+static int calc_greedy_value(char board[SIZE][SIZE], int r1, int c1, int r2, int c2, char player) {
+
     char sim[SIZE][SIZE];
+
     copy_board(sim, board);
+
+    int before = count_pieces(sim, player);
+
     apply_move(sim, r1, c1, r2, c2, player);
-    char opp = (player == 'R') ? 'B' : 'R';
 
-    int opp_moves[SIZE*SIZE*8][4];
-    int opp_cnt = gather_moves(sim, opp, opp_moves);
-    int max_gv = 0;
-    for (int i = 0; i < opp_cnt; i++) {
-        int or1 = opp_moves[i][0], oc1 = opp_moves[i][1];
-        int or2 = opp_moves[i][2], oc2 = opp_moves[i][3];
-        int gv = calc_greedy_value(sim, or1, oc1, or2, oc2, opp);
-        if (gv > max_gv) max_gv = gv;
-    }
-    return max_gv;
+    int after = count_pieces(sim, player);
+
+    return after - before;
+
 }
 
-// (r1,c1)->(r2,c2)이 점프인지 검사하고, safe jump(안전한 점프)인지 여부 반환
-// safe jump: 내가 점프해서 출발지 칸이 비워진 뒤, 상대가 그 출발지로 이동할 수 없으면 안전
+
+
+// (r1,c1)->(r2,c2) 이동이 “안전한 점프”인지 검사
+
+// 안전한 점프: 점프 후 출발지에 상대가 들어올 수 없으면 true
+
 static int is_safe_jump(char board[SIZE][SIZE], int r1, int c1, int r2, int c2, char player) {
-    int dr = abs(r2 - r1), dc = abs(c2 - c1);
-    int jump = ((dr == 2 && dc == 0) || (dr == 0 && dc == 2) || (dr == 2 && dc == 2));
-    if (!jump) return 0; // clone은 점프가 아님
+
+    int drc = abs(r2 - r1), dcc = abs(c2 - c1);
+
+    int jump = ((drc == 2 && dcc == 0) || (drc == 0 && dcc == 2) || (drc == 2 && dcc == 2));
+
+    if (!jump) return 0;
 
     char sim[SIZE][SIZE];
+
     copy_board(sim, board);
-    // 점프하면 출발지(r1,c1)는 빈칸이 됨
-    sim[r1][c1] = '.';
+
+    sim[r1][c1] = '.';  // 점프 후 출발지는 빈칸
+
     char opp = (player == 'R') ? 'B' : 'R';
-    if (can_opponent_move_to(sim, r1, c1, opp)) return 0; // 상대가 들어올 수 있으면 unsafe
-    return 1; // 들어올 수 없으면 safe
-}
 
-// 목적지(r2,c2) 주변 8칸에 내 돌이 몇 개 있나 세고, 
-// 만약 모서리(가장자리)이면 +3, 꼭짓점(4개 코너)이면 +4 보너스 붙여 반환
-static int calc_friend_count(char board[SIZE][SIZE], int r2, int c2, char player) {
-    int cnt = 0;
-    for (int dy = -1; dy <= 1; dy++) {
-        for (int dx = -1; dx <= 1; dx++) {
-            if (dy == 0 && dx == 0) continue;
-            int nr = r2 + dy, nc = c2 + dx;
-            if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) continue;
-            if (board[nr][nc] == player) cnt++;
+    // 상대의 모든 이동 후보 탐색: 출발지(r1,c1)로 올 수 있는지 검사
+
+    for (int rr = 0; rr < SIZE; rr++) {
+
+        for (int cc = 0; cc < SIZE; cc++) {
+
+            if (sim[rr][cc] != opp) continue;
+
+            int drd = abs(r1 - rr), dcd = abs(c1 - cc);
+
+            if ((drd <= 1 && dcd <= 1 && !(drd == 0 && dcd == 0)) ||  // 클론 가능
+
+                ((drd == 2 && dcd == 0) || (drd == 0 && dcd == 2) || (drd == 2 && dcd == 2))) {
+
+                return 0;  // 상대가 들어올 수 있으면 unsafe
+
+            }
+
         }
+
     }
-    // 모서리/꼭짓점 보너스
-    int edge = (r2 == 0 || r2 == SIZE-1) + (c2 == 0 || c2 == SIZE-1);
-    if (edge == 2) cnt += 5;   // 꼭짓점
-    else if (edge == 1) cnt += 1; // 모서리
-    return cnt;
+
+    return 1;
+
 }
 
-void generate_move(const cJSON *board_json, int *sx, int *sy, int *tx, int *ty, char me) {
+
+
+// (r2,c2) 주변 8방향에 있는 내 말 개수 + 모서리/꼭짓점 보너스
+
+static int calc_friend_count(char board[SIZE][SIZE], int r2, int c2, char player) {
+
+    int cnt = 0;
+
+    for (int f = 0; f < 8; f++) {
+
+        int nr = r2 + dr[f], nc = c2 + dc[f];
+
+        if (boundary_check(nr, nc) && board[nr][nc] == player) {
+
+            cnt++;
+
+        }
+
+    }
+
+    int edge = (r2 == 0 || r2 == SIZE - 1) + (c2 == 0 || c2 == SIZE - 1);
+
+    if (edge == 2)      cnt += 3;  // 꼭짓점이면 +3
+
+    else if (edge == 1) cnt += 1;  // 모서리면 +1
+
+    return cnt;
+
+}
+
+
+
+// 이미 구현된 “2중 그리디” 함수 프로토타입 (본문에서는 정의되어 있어야 합니다)
+
+extern bool move_generate_greedy_2n(char b[SIZE][SIZE], char player,
+
+                                    int *out_r1, int *out_c1,
+
+                                    int *out_r2, int *out_c2);
+
+
+
+// 5중 그리디 평가 함수
+
+// myGV1 − oppGV1 + myGV2 − oppGV2 + myGV3 계산
+
+static int evaluate_five_greedy(char board[SIZE][SIZE],
+
+                                int r1, int c1, int r2, int c2, char me) {
+
+    char opp = (me == 'R') ? 'B' : 'R';
+
+
+
+    // 1차: 내가 (r1,c1)->(r2,c2) 두었을 때의 내 그리디 값
+
+    int myGV1 = calc_greedy_value(board, r1, c1, r2, c2, me);
+
+
+
+    // 1차 이동 적용
+
+    char board1[SIZE][SIZE];
+
+    copy_board(board1, board);
+
+    apply_move(board1, r1, c1, r2, c2, me);
+
+
+
+    // 2차: 상대가(opp) 최선의 그리디 수 선택
+
+    int opp_moves1[SIZE*SIZE*8][4];
+
+    int opp_cnt1 = gather_moves(board1, opp, opp_moves1);
+
+    int bestOppGV1 = 0;
+
+    int or11 = -1, oc11 = -1, or12 = -1, oc12 = -1;
+
+    for (int i = 0; i < opp_cnt1; i++) {
+
+        int rr1 = opp_moves1[i][0], cc1 = opp_moves1[i][1];
+
+        int rr2 = opp_moves1[i][2], cc2 = opp_moves1[i][3];
+
+        int g = calc_greedy_value(board1, rr1, cc1, rr2, cc2, opp);
+
+        if (i == 0 || g > bestOppGV1) {
+
+            bestOppGV1 = g;
+
+            or11 = rr1;  oc11 = cc1;
+
+            or12 = rr2;  oc12 = cc2;
+
+        }
+
+    }
+
+    // 2차 이동 적용
+
+    char board2[SIZE][SIZE];
+
+    if (opp_cnt1 > 0) {
+
+        copy_board(board2, board1);
+
+        apply_move(board2, or11, oc11, or12, oc12, opp);
+
+    } else {
+
+        copy_board(board2, board1);
+
+    }
+
+
+
+    // 3차: 내가 최선의 그리디 수 선택
+
+    int my_moves2[SIZE*SIZE*8][4];
+
+    int my_cnt2 = gather_moves(board2, me, my_moves2);
+
+    int bestMyGV2 = 0;
+
+    int mr21 = -1, mc21 = -1, mr22 = -1, mc22 = -1;
+
+    for (int i = 0; i < my_cnt2; i++) {
+
+        int rr1 = my_moves2[i][0], cc1 = my_moves2[i][1];
+
+        int rr2 = my_moves2[i][2], cc2 = my_moves2[i][3];
+
+        int g = calc_greedy_value(board2, rr1, cc1, rr2, cc2, me);
+
+        if (i == 0 || g > bestMyGV2) {
+
+            bestMyGV2 = g;
+
+            mr21 = rr1;  mc21 = cc1;
+
+            mr22 = rr2;  mc22 = cc2;
+
+        }
+
+    }
+
+    // 3차 이동 적용
+
+    char board3[SIZE][SIZE];
+
+    if (my_cnt2 > 0) {
+
+        copy_board(board3, board2);
+
+        apply_move(board3, mr21, mc21, mr22, mc22, me);
+
+    } else {
+
+        copy_board(board3, board2);
+
+    }
+
+
+
+    // 4차: 상대이 최선 그리디 수 선택
+
+    int opp_moves2[SIZE*SIZE*8][4];
+
+    int opp_cnt2 = gather_moves(board3, opp, opp_moves2);
+
+    int bestOppGV2 = 0;
+
+    int or21 = -1, oc21 = -1, or22 = -1, oc22 = -1;
+
+    for (int i = 0; i < opp_cnt2; i++) {
+
+        int rr1 = opp_moves2[i][0], cc1 = opp_moves2[i][1];
+
+        int rr2 = opp_moves2[i][2], cc2 = opp_moves2[i][3];
+
+        int g = calc_greedy_value(board3, rr1, cc1, rr2, cc2, opp);
+
+        if (i == 0 || g > bestOppGV2) {
+
+            bestOppGV2 = g;
+
+            or21 = rr1;  oc21 = cc1;
+
+            or22 = rr2;  oc22 = cc2;
+
+        }
+
+    }
+
+    // 4차 이동 적용
+
+    char board4[SIZE][SIZE];
+
+    if (opp_cnt2 > 0) {
+
+        copy_board(board4, board3);
+
+        apply_move(board4, or21, oc21, or22, oc22, opp);
+
+    } else {
+
+        copy_board(board4, board3);
+
+    }
+
+
+
+    // 5차: 내가 최선의 그리디 수 선택
+
+    int my_moves3[SIZE*SIZE*8][4];
+
+    int my_cnt3 = gather_moves(board4, me, my_moves3);
+
+    int bestMyGV3 = 0;
+
+    for (int i = 0; i < my_cnt3; i++) {
+
+        int rr1 = my_moves3[i][0], cc1 = my_moves3[i][1];
+
+        int rr2 = my_moves3[i][2], cc2 = my_moves3[i][3];
+
+        int g = calc_greedy_value(board4, rr1, cc1, rr2, cc2, me);
+
+        if (i == 0 || g > bestMyGV3) {
+
+            bestMyGV3 = g;
+
+        }
+
+    }
+
+
+
+    return (myGV1 - bestOppGV1 + bestMyGV2 - bestOppGV2 + bestMyGV3);
+
+}
+
+
+
+// 5중 그리디를 사용하여 이동 선택
+
+void generate_move(const cJSON *board_json, int *sx, int *sy, int *tx, int *ty) {
+
     char board[SIZE][SIZE];
+
     parse_board(board_json, board);
 
-    // 여기서는 편의상 “내 말”을 항상 'R'이라고 가정
-    // 나중에 클라이언트 쪽에서 첫 플레이어인지 판별해 'B'로 바꿔 주어야 함
 
-    // 1) 내 모든 유효 이동 후보 수집
-    int moves[SIZE*SIZE*8][4];
-    int n_moves = gather_moves(board, me, moves);
-    if (n_moves == 0) {
-        // 이동 불가 → 패스
-        *sx = *sy = *tx = *ty = 0;
-        return;
+
+    char me = 'R';
+
+
+
+    // ─── 남은 빈칸 개수 세기 ──────────────────────────────────────────────
+
+    int empty_cnt = 0;
+
+    for (int i = 0; i < SIZE; i++) {
+
+        for (int j = 0; j < SIZE; j++) {
+
+            if (board[i][j] == '.') empty_cnt++;
+
+        }
+
     }
 
-    // 최종 후보를 담을 변수
+    bool last_one = (empty_cnt == 1);
+
+    // ────────────────────────────────────────────────────────────────────
+
+
+
+    int moves[SIZE*SIZE*8][4];
+
+    int n_moves = gather_moves(board, me, moves);
+
+    if (n_moves == 0) {
+
+        *sx = *sy = *tx = *ty = 0;
+
+        return;
+
+    }
+
+
+
     int bestEval   = -1000000;
-    int bestType   =  3;    // type: 0=safe jump, 1=clone, 2=unsafe jump
-    int bestFriend = -1;    // 친구 수
+
+    int bestType   =  3;
+
+    int bestFriend = -1;
+
     int bestR1=0, bestC1=0, bestR2=0, bestC2=0;
 
-    // 2) 각 후보 이동마다 “Eval” 계산 → (내 그리디) – (상대 최대 그리디)
+
+
     for (int i = 0; i < n_moves; i++) {
+
         int r1 = moves[i][0], c1 = moves[i][1];
+
         int r2 = moves[i][2], c2 = moves[i][3];
 
-        int myGV  = calc_greedy_value(board, r1, c1, r2, c2, me);
-        int oppGV = calc_opponent_max_greedy(board, r1, c1, r2, c2, me);
-        int eval  = myGV - oppGV;
 
-        // 이동 유형 판별: jump/clone, 그리고 safe jump 여부
-        int dr = abs(r2 - r1), dc = abs(c2 - c1);
-        int jump = ((dr == 2 && dc == 0) || (dr == 0 && dc == 2) || (dr == 2 && dc == 2));
-        int safe = is_safe_jump(board, r1, c1, r2, c2, me);
+
+        int drc = abs(r2 - r1), dcc = abs(c2 - c1);
+
+        bool is_jump = (drc == 2 || dcc == 2);
+
+
+
+        // 빈칸 하나 남았으면 점프 금지
+
+        if (last_one && is_jump) continue;
+
+
+
+        int eval = evaluate_five_greedy(board, r1, c1, r2, c2, me);
+
+
+
+        bool safe = is_safe_jump(board, r1, c1, r2, c2, me);
+
         int type;
-        if (jump && safe) type = 0;      // 안전한 점프
-        else if (!jump)  type = 1;       // 클론
-        else              type = 2;      // 불안전한 점프
 
-        // “친구 수” 계산을 위해 시뮬 보드에 한 번 적용
+        if (is_jump && safe) type = 0;
+
+        else if (!is_jump)   type = 1;
+
+        else                 type = 2;
+
+
+
         char sim[SIZE][SIZE];
+
         copy_board(sim, board);
+
         apply_move(sim, r1, c1, r2, c2, me);
+
         int friendCnt = calc_friend_count(sim, r2, c2, me);
 
-        // 3단계 우선순위 비교: Eval → type → friendCnt → 좌표(행,열)
-        int better = 0;
-        if (eval > bestEval) better = 1;
-        else if (eval == bestEval) {
-            if (type < bestType) better = 1;
-            else if (type == bestType) {
-                if (friendCnt > bestFriend) better = 1;
-                else if (friendCnt == bestFriend) {
-                    // 좌표 비교: r2(행) 오름차순, 같으면 c2(열) 오름차순
-                    if (r2 < bestR2 || (r2 == bestR2 && c2 < bestC2)) better = 1;
+
+
+        bool better = false;
+
+        if (eval > bestEval) {
+
+            better = true;
+
+        } else if (eval == bestEval) {
+
+            if (type < bestType) {
+
+                better = true;
+
+            } else if (type == bestType) {
+
+                if (friendCnt > bestFriend) {
+
+                    better = true;
+
+                } else if (friendCnt == bestFriend) {
+
+                    if (r2 < bestR2 || (r2 == bestR2 && c2 < bestC2)) {
+
+                        better = true;
+
+                    }
+
                 }
+
             }
+
         }
+
+
 
         if (better) {
+
             bestEval   = eval;
+
             bestType   = type;
+
             bestFriend = friendCnt;
-            bestR1 = r1;    bestC1 = c1;
-            bestR2 = r2;    bestC2 = c2;
+
+            bestR1 = r1; bestC1 = c1;
+
+            bestR2 = r2; bestC2 = c2;
+
         }
+
     }
 
-    // 최종 선택된 이동을 1-based 인덱스로 리턴
+
+
     *sx = bestR1 + 1;
+
     *sy = bestC1 + 1;
+
     *tx = bestR2 + 1;
+
     *ty = bestC2 + 1;
+
 }
+
 
 // recv_json: fd로부터 '\n' 단위로 JSON 문자열 한 줄을 읽어서 동적 할당된 문자열로 반환
 static char *recv_json(int fd) {
