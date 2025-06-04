@@ -507,15 +507,11 @@ static int evaluate_five_greedy(char board[SIZE][SIZE],
 
 // 5중 그리디를 사용하여 이동 선택
 
-void generate_move(const cJSON *board_json, int *sx, int *sy, int *tx, int *ty) {
+void generate_move(const cJSON *board_json, int *sx, int *sy, int *tx, int *ty, char me) {
 
     char board[SIZE][SIZE];
 
     parse_board(board_json, board);
-
-
-
-    char me = 'R';
 
 
 
