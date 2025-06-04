@@ -466,6 +466,7 @@ int main(int argc, char *argv[]) {
             cJSON* first_player = cJSON_GetObjectItemCaseSensitive(root, "first_player");
             if(strcmp(first_player->valuestring, g_username) == 0) me = 'R';
             else me = 'B';
+            printf("%c\n", me);
             printf("[서버] game_start 수신\n");
             // 첫 플레이어 정보는 board.c 내부 로직에서 필요 시 사용
         }
