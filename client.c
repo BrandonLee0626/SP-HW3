@@ -213,13 +213,12 @@ static int calc_friend_count(char board[SIZE][SIZE], int r2, int c2, char player
     return cnt;
 }
 
-void generate_move(const cJSON *board_json, int *sx, int *sy, int *tx, int *ty) {
+void generate_move(const cJSON *board_json, int *sx, int *sy, int *tx, int *ty, char me) {
     char board[SIZE][SIZE];
     parse_board(board_json, board);
 
     // 여기서는 편의상 “내 말”을 항상 'R'이라고 가정
     // 나중에 클라이언트 쪽에서 첫 플레이어인지 판별해 'B'로 바꿔 주어야 함
-    char me = 'R';
 
     // 1) 내 모든 유효 이동 후보 수집
     int moves[SIZE*SIZE*8][4];
@@ -348,6 +347,8 @@ int main(int argc, char *argv[]) {
     options.brightness = 50;
     options.disable_hardware_pulsing = 1;
 
+    char me;
+
     struct RGBLedMatrix *matrix = led_matrix_create_from_options(&options, NULL, NULL);
     if (matrix == NULL) {
         return 1;
@@ -463,6 +464,9 @@ int main(int argc, char *argv[]) {
         // game_start
         //──────────────────────────────────────────────────────────────────────
         else if (strcmp(type->valuestring, "game_start") == 0) {
+            cJSON* first_player = cJSON_GetObjectItemCaseSensitive("first_player");
+            if(strcmp(first_player->valuestring, g_username) == 0) me = 'R';
+            else me = 'B';
             printf("[서버] game_start 수신\n");
             // 첫 플레이어 정보는 board.c 내부 로직에서 필요 시 사용
         }
@@ -483,7 +487,7 @@ int main(int argc, char *argv[]) {
                 int sx = 0, sy = 0, tx = 0, ty = 0;
 
                 // generate_move 함수 호출: 보드 상태에서 최적 수 계산
-                generate_move(board_json, &sx, &sy, &tx, &ty);
+                generate_move(board_json, &sx, &sy, &tx, &ty, me);
 
                 cJSON *mv = cJSON_CreateObject();
                 cJSON_AddStringToObject(mv, "type", "move");
