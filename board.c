@@ -87,5 +87,7 @@ int main()
     }
 
     draw_board(canvas, board);
+
+    sleep(10);
 }
 #endif
