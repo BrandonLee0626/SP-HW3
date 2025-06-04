@@ -434,7 +434,6 @@ int main(int argc, char *argv[]) {
 
     // 4) 서버 메시지 수신 루프
     while (1) {
-        clear_board(canvas);
         char *msg = recv_json(sockfd);
         if (!msg) {
             printf("서버 연결 종료 또는 수신 실패\n");
@@ -479,6 +478,7 @@ int main(int argc, char *argv[]) {
             cJSON *timeout    = cJSON_GetObjectItem(root, "timeout");
 
             get_board(board_json, int_board);
+            clear_board(canvas);
             draw_board(canvas, int_board);
 
             usleep(100000);
