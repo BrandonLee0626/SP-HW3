@@ -12,4 +12,4 @@ board: board.c
 	
 
 clean:
-	rm -f client
+	rm -f client board
