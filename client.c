@@ -822,6 +822,7 @@ int main(int argc, char *argv[]) {
             else me = 'B';
             printf("%c\n", me);
             printf("[서버] game_start 수신\n");
+        }
 
         else if (strcmp(type->valuestring, "your_turn") == 0) {
             printf("[서버] your_turn 수신\n");
