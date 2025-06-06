@@ -25,7 +25,7 @@ void draw_X(struct LedCanvas *canvas, int x, int y)
 void draw_board(struct LedCanvas *canvas, int board[][10]) {
     for(int i=1;i<=8;i++){
         for(int j=1;j<=8;j++){
-            if(board[i][j] == 1) draw_X(canvas, (i-1)*8, (8-j)*8)
+            if(board[i][j] == 1) draw_X(canvas, (i-1)*8, (8-j)*8);
             if(board[i][j] == 2) draw_box(canvas, (i-1)*8, (8-j)*8, 255, 0, 0);
             if(board[i][j] == 3) draw_box(canvas, (i-1)*8, (8-j)*8, 0, 0, 255);
         }
