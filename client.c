@@ -910,6 +910,7 @@ int main(int argc, char *argv[]) {
             }
             cJSON_Delete(root);
             break;  
+        }
 
         else {
             printf("[서버] 알 수 없는 메시지 유형: %s\n", type->valuestring);
